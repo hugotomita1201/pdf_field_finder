@@ -25,10 +25,9 @@ const fileSize = document.getElementById('fileSize');
 let currentFile = null;
 let currentResults = null;
 
-// API Base URL - automatically detect if we're in production
-const API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:3002' 
-    : ''; // Use same origin in production
+// API Base URL - use config or fallback to localhost for development
+const API_URL = window.APP_CONFIG?.API_URL || 
+    (window.location.hostname === 'localhost' ? 'http://localhost:3002' : 'https://pdf-field-finder-backend.onrender.com');
 
 // Initialize event listeners
 function init() {

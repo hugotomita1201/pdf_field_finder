@@ -25,8 +25,10 @@ app.use((req, res, next) => {
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || true,
-  credentials: true
+  origin: process.env.FRONTEND_URL || '*',
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
@@ -86,8 +88,10 @@ app.post('/api/extract', upload.single('pdf'), async (req, res) => {
   }
 });
 
-// Serve static frontend files
-app.use(express.static(path.join(__dirname, '../frontend')));
+// Only serve static files if NOT in production (for local development)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(express.static(path.join(__dirname, '../frontend')));
+}
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {

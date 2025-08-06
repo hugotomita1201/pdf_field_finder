@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: pdf-field-finder-backend
+    runtime: docker
+    repo: https://github.com/hugotomita1201/pdf_field_finder.git
+    rootDir: backend
+    dockerfilePath: ./Dockerfile.backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_URL
+        value: https://pdf-field-finder.onrender.com
+    healthCheckPath: /health

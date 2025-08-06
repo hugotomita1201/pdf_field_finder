@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: pdf-field-finder
+    runtime: static
+    repo: https://github.com/hugotomita1201/pdf_field_finder.git
+    rootDir: frontend
+    staticPublishPath: .
+    buildCommand: |
+      echo "window.BACKEND_URL = 'https://pdf-field-finder-backend.onrender.com';" > config.js
+    headers:
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: "*"
