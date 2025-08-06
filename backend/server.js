@@ -8,6 +8,21 @@ const { extractPdfFields } = require('./extractFields');
 const app = express();
 const PORT = process.env.PORT || 3002;
 
+// Security headers middleware
+app.use((req, res, next) => {
+  // Set Content Security Policy to allow necessary resources
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com; " +
+    "script-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data:; " +
+    "connect-src 'self';"
+  );
+  next();
+});
+
 // Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || true,

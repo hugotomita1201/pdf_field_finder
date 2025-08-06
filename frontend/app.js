@@ -360,5 +360,23 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Initialize app
-init();
+// Initialize app when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
+
+// Log any custom element conflicts (likely from browser extensions)
+if (window.customElements) {
+    const originalDefine = customElements.define;
+    customElements.define = function(name, constructor, options) {
+        try {
+            originalDefine.call(this, name, constructor, options);
+        } catch (e) {
+            if (!e.message.includes('mce-autosize-textarea')) {
+                console.warn('Custom element conflict (likely from extension):', e.message);
+            }
+        }
+    };
+}
