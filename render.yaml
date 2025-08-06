@@ -1,0 +1,31 @@
+services:
+  # Backend API Service
+  - type: web
+    name: pdf-field-extractor-api
+    runtime: docker
+    repo: https://github.com/YOUR_USERNAME/pdf-field-extractor
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_URL
+        value: https://pdf-field-extractor.onrender.com
+    healthCheckPath: /health
+    
+  # Frontend Static Site
+  - type: web
+    name: pdf-field-extractor-frontend
+    runtime: static
+    repo: https://github.com/YOUR_USERNAME/pdf-field-extractor
+    rootDir: frontend
+    buildCommand: echo "No build needed"
+    staticPublishPath: .
+    headers:
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: "*"
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://pdf-field-extractor-api.onrender.com/api/*
