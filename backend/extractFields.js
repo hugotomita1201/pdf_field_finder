@@ -2,6 +2,7 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
 const fs = require('fs').promises;
+const { extractFieldsWithLabels } = require('./extractFieldsWithLabels');
 
 /**
  * Extract field names and information from a PDF using pdftk
@@ -31,15 +32,34 @@ async function extractPdfFields(pdfPath) {
     // Generate formatted text output
     const textOutput = generateTextOutput(fields);
     
-    // Organize fields by section/part
-    const organizedFields = organizeFields(fields);
+    // Try to extract fields with labels
+    let enhancedFields = [];
+    try {
+      enhancedFields = await extractFieldsWithLabels(pdfPath);
+    } catch (error) {
+      console.log('Could not extract field labels:', error.message);
+      // Fall back to fields without labels
+      enhancedFields = fields.map(field => ({
+        ...field,
+        label: 'Unknown',
+        labelConfidence: 0
+      }));
+    }
+    
+    // Organize fields by section/part (now with enhanced fields)
+    const organizedFields = organizeFields(enhancedFields);
+    
+    // Generate enhanced text output with labels
+    const enhancedTextOutput = generateEnhancedTextOutput(enhancedFields);
     
     return {
       totalFields: fields.length,
       fileSizeKB,
       fields: organizedFields,
       rawFields: fields,
+      enhancedFields: enhancedFields,
       textOutput,
+      enhancedTextOutput,
       hasFields: fields.length > 0
     };
     
@@ -177,11 +197,108 @@ function organizeFields(fields) {
       checkboxValues: field.stateOptions ? {
         toCheck: field.stateOptions.filter(v => v !== 'Off'),
         toUncheck: 'Off'
-      } : undefined
+      } : undefined,
+      label: field.label,
+      labelConfidence: field.labelConfidence,
+      flags: field.flags,
+      justification: field.justification
     });
   }
   
   return organized;
+}
+
+/**
+ * Generate enhanced text output with field labels
+ */
+function generateEnhancedTextOutput(fields) {
+  let output = '=================================\n';
+  output += '  PDF FIELD EXTRACTION WITH LABELS\n';
+  output += '=================================\n\n';
+  output += `Total Fields: ${fields.length}\n`;
+  output += `Extraction Date: ${new Date().toISOString()}\n`;
+  output += '\n---------------------------------\n';
+  output += '      FIELDS WITH LABELS\n';
+  output += '---------------------------------\n\n';
+  
+  // Group by type for better readability
+  const byType = {};
+  for (const field of fields) {
+    const type = field.type || 'Unknown';
+    if (!byType[type]) byType[type] = [];
+    byType[type].push(field);
+  }
+  
+  // Output each type section
+  for (const [type, typeFields] of Object.entries(byType)) {
+    output += `\n[${type.toUpperCase()} FIELDS] (${typeFields.length} fields)\n`;
+    output += '─'.repeat(50) + '\n';
+    
+    for (const field of typeFields) {
+      output += `\nField Name: ${field.name}\n`;
+      
+      // Add the label information
+      if (field.label && field.label !== 'Unknown') {
+        output += `  📝 Label: "${field.label}"`;
+        if (field.labelConfidence !== undefined) {
+          const confidencePercent = Math.round(field.labelConfidence * 100);
+          output += ` (${confidencePercent}% confidence)\n`;
+        } else {
+          output += '\n';
+        }
+      } else {
+        output += `  📝 Label: Not identified\n`;
+      }
+      
+      if (field.value) {
+        output += `  Current Value: ${field.value}\n`;
+      }
+      
+      if (field.maxLength) {
+        output += `  Max Length: ${field.maxLength}\n`;
+      }
+      
+      // Enhanced checkbox/radio value display
+      if (field.stateOptions && field.stateOptions.length > 0) {
+        output += `  ✓ CHECKBOX/RADIO VALUES:\n`;
+        for (const option of field.stateOptions) {
+          if (option === 'Off') {
+            output += `    • "${option}" = Unchecked/Unselected\n`;
+          } else {
+            output += `    • "${option}" = Checked/Selected\n`;
+          }
+        }
+      }
+      
+      if (field.flags && field.flags !== '0') {
+        output += `  Flags: ${field.flags}\n`;
+      }
+    }
+  }
+  
+  output += '\n\n=================================\n';
+  output += '       JSON FIELD MAPPING\n';
+  output += '=================================\n\n';
+  output += 'For programmatic use, here is the field mapping:\n\n';
+  output += '[\n';
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i];
+    output += '  {\n';
+    output += `    "fieldName": "${field.name}",\n`;
+    output += `    "label": "${field.label || 'Unknown'}",\n`;
+    output += `    "type": "${field.type}",\n`;
+    if (field.maxLength) {
+      output += `    "maxLength": ${field.maxLength},\n`;
+    }
+    if (field.stateOptions) {
+      output += `    "options": ${JSON.stringify(field.stateOptions)},\n`;
+    }
+    output += `    "confidence": ${field.labelConfidence || 0}\n`;
+    output += '  }' + (i < fields.length - 1 ? ',' : '') + '\n';
+  }
+  output += ']\n';
+  
+  return output;
 }
 
 /**

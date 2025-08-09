@@ -164,15 +164,39 @@ function displayResults(data) {
     fieldCount.textContent = `${data.totalFields} fields`;
     fileSize.textContent = `${data.fileSizeKB} KB`;
     
-    // Populate outputs
-    formattedOutput.value = data.textOutput || '';
+    // Populate outputs - use enhanced text output if available
+    formattedOutput.value = data.enhancedTextOutput || data.textOutput || '';
     
     // Create raw field names output
     const fieldNames = data.rawFields.map(f => f.name).join('\n');
     rawOutput.value = fieldNames;
     
-    // Create JSON output
-    jsonOutput.value = JSON.stringify(data.fields, null, 2);
+    // Create enhanced JSON output with labels
+    let jsonData;
+    if (data.enhancedFields && data.enhancedFields.length > 0) {
+        // Create a clean JSON structure with labels
+        jsonData = data.enhancedFields.map(field => ({
+            type: field.type,
+            name: field.name,
+            label: field.label || 'Unknown',
+            labelConfidence: field.labelConfidence !== undefined ? 
+                Math.round(field.labelConfidence * 100) + '%' : 'N/A',
+            flags: field.flags || '1',
+            justification: field.justification || 'Left',
+            maxLength: field.maxLength || null,
+            value: field.value || '',
+            options: field.stateOptions || field.options || null,
+            checkboxValues: field.stateOptions ? {
+                toCheck: (field.stateOptions || []).filter(v => v !== 'Off'),
+                toUncheck: 'Off'
+            } : null
+        }));
+    } else {
+        // Fallback to original fields structure
+        jsonData = data.fields;
+    }
+    
+    jsonOutput.value = JSON.stringify(jsonData, null, 2);
     
     // Display field type breakdown
     displayBreakdown(data.fields.byType);
@@ -253,11 +277,13 @@ async function copyToClipboard(text) {
 function downloadText() {
     if (!currentResults) return;
     
-    const blob = new Blob([currentResults.textOutput], { type: 'text/plain' });
+    // Use enhanced text output if available, otherwise fall back to regular
+    const textContent = currentResults.enhancedTextOutput || currentResults.textOutput;
+    const blob = new Blob([textContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${currentFile.name.replace('.pdf', '')}_fields.txt`;
+    a.download = `${currentFile.name.replace('.pdf', '')}_fields_with_labels.txt`;
     a.click();
     URL.revokeObjectURL(url);
     showToast('Download started!');
@@ -267,12 +293,34 @@ function downloadText() {
 function downloadJSON() {
     if (!currentResults) return;
     
-    const jsonData = JSON.stringify(currentResults.fields, null, 2);
+    // Use enhanced fields if available, otherwise fall back to regular fields
+    let jsonData;
+    if (currentResults.enhancedFields && currentResults.enhancedFields.length > 0) {
+        jsonData = JSON.stringify(currentResults.enhancedFields.map(field => ({
+            type: field.type,
+            name: field.name,
+            label: field.label || 'Unknown',
+            labelConfidence: field.labelConfidence !== undefined ? 
+                Math.round(field.labelConfidence * 100) + '%' : 'N/A',
+            flags: field.flags || '1',
+            justification: field.justification || 'Left',
+            maxLength: field.maxLength || null,
+            value: field.value || '',
+            options: field.stateOptions || field.options || null,
+            checkboxValues: field.stateOptions ? {
+                toCheck: (field.stateOptions || []).filter(v => v !== 'Off'),
+                toUncheck: 'Off'
+            } : null
+        })), null, 2);
+    } else {
+        jsonData = JSON.stringify(currentResults.fields, null, 2);
+    }
+    
     const blob = new Blob([jsonData], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${currentFile.name.replace('.pdf', '')}_fields.json`;
+    a.download = `${currentFile.name.replace('.pdf', '')}_fields_with_labels.json`;
     a.click();
     URL.revokeObjectURL(url);
     showToast('Download started!');
