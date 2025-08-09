@@ -91,37 +91,50 @@ async function extractTextContent(pdfPath) {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       if (line) {
-        // Look for common label patterns
-        if (line.endsWith(':') || 
-            line.includes('Name') || 
-            line.includes('Address') || 
-            line.includes('Date') ||
-            line.includes('Phone') ||
-            line.includes('Email') ||
-            line.includes('Number') ||
-            line.includes('Code') ||
-            line.includes('Country') ||
-            line.includes('State') ||
-            line.includes('City') ||
-            line.includes('ZIP') ||
-            line.includes('Yes') ||
-            line.includes('No') ||
-            /^\d+\./.test(line) || // Numbered items
-            /^[A-Z]\./.test(line) || // Lettered items
-            /^\([a-z]\)/.test(line)) { // Parenthetical items
-          
-          textElements.push({
-            text: line,
-            lineNumber: i,
-            isLikelyLabel: true
-          });
-        } else {
-          textElements.push({
-            text: line,
-            lineNumber: i,
-            isLikelyLabel: false
-          });
-        }
+        // Look for common label patterns - expanded detection
+        const isLikelyLabel = 
+          line.endsWith(':') || 
+          line.endsWith('?') ||
+          line.includes('Name') || 
+          line.includes('Address') || 
+          line.includes('Date') ||
+          line.includes('Phone') ||
+          line.includes('Email') ||
+          line.includes('Number') ||
+          line.includes('Code') ||
+          line.includes('Country') ||
+          line.includes('State') ||
+          line.includes('City') ||
+          line.includes('ZIP') ||
+          line.includes('Yes') ||
+          line.includes('No') ||
+          line.includes('Type') ||
+          line.includes('Status') ||
+          line.includes('Application') ||
+          line.includes('Applicant') ||
+          line.includes('Beneficiary') ||
+          line.includes('Petitioner') ||
+          line.includes('Employer') ||
+          line.includes('Form') ||
+          line.includes('Part') ||
+          line.includes('Section') ||
+          line.includes('Information') ||
+          line.includes('Select') ||
+          line.includes('Check') ||
+          line.includes('Mark') ||
+          line.includes('Indicate') ||
+          /^\d+\./.test(line) || // Numbered items (1. 2. etc)
+          /^[A-Z]\./.test(line) || // Lettered items (A. B. etc)
+          /^\([a-z]\)/.test(line) || // Parenthetical items ((a) (b) etc)
+          /^Part \d+/i.test(line) || // Part references
+          /^Section \d+/i.test(line) || // Section references
+          /^Item \d+/i.test(line); // Item references
+        
+        textElements.push({
+          text: line,
+          lineNumber: i,
+          isLikelyLabel: isLikelyLabel
+        });
       }
     }
     
@@ -168,15 +181,22 @@ function matchFieldsWithLabels(fields, textContent) {
     
     // Strategy 3: Use common patterns based on field type and name
     if (!matchedLabel || confidence < 0.5) {
-      matchedLabel = inferLabelFromFieldName(field.name, field.type);
-      if (matchedLabel) {
+      const inferredLabel = inferLabelFromFieldName(field.name, field.type);
+      if (inferredLabel && inferredLabel !== field.name) {
+        matchedLabel = inferredLabel;
         confidence = 0.7; // Medium confidence for inferred labels
       }
     }
     
+    // If still no good label found, don't just return the field name
+    if (!matchedLabel || matchedLabel === field.name) {
+      matchedLabel = null;
+      confidence = 0;
+    }
+    
     enhancedFields.push({
       ...field,
-      label: matchedLabel || 'Unknown',
+      label: matchedLabel,
       labelConfidence: confidence,
       fieldNameParts: fieldNameParts
     });
@@ -294,6 +314,8 @@ function inferLabelFromFieldName(fieldName, fieldType) {
     'JobTitle': 'Job Title',
     'Occupation': 'Occupation',
     'Department': 'Department',
+    'AppType': 'Application Type',
+    'ApplicationType': 'Application Type',
     
     // Document specific
     'CaseNumber': 'Case Number',
@@ -323,15 +345,28 @@ function inferLabelFromFieldName(fieldName, fieldType) {
     return `Part ${partMatch[1]}`;
   }
   
-  // For checkboxes, try to extract meaningful text
+  // Special handling for CB_AppType fields
+  if (fieldName.includes('CB_AppType')) {
+    return 'Application Type Selection';
+  }
+  
+  // For checkboxes, try to extract meaningful text but avoid returning just the field name
   if (fieldType === 'Button' && (fieldName.includes('CB') || fieldName.includes('Check'))) {
-    const cleanedName = fieldName
-      .replace(/CB_?/gi, '')
-      .replace(/Check_?/gi, '')
+    // Extract the meaningful part after CB_ or Check_
+    let cleanedName = fieldName
+      .replace(/^.*CB_/i, '')
+      .replace(/^.*Check_/i, '')
+      .replace(/\[\d+\]$/g, '') // Remove array indices
       .replace(/_/g, ' ')
       .trim();
-    if (cleanedName) {
-      return cleanedName;
+    
+    // Only return if we extracted something meaningful
+    if (cleanedName && cleanedName !== fieldName && cleanedName.length > 2) {
+      // Add context for common checkbox patterns
+      if (cleanedName.toLowerCase().includes('yes') || cleanedName.toLowerCase().includes('no')) {
+        return 'Yes/No Selection';
+      }
+      return cleanedName + ' Selection';
     }
   }
   

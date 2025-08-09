@@ -41,7 +41,7 @@ async function extractPdfFields(pdfPath) {
       // Fall back to fields without labels
       enhancedFields = fields.map(field => ({
         ...field,
-        label: 'Unknown',
+        label: null,
         labelConfidence: 0
       }));
     }

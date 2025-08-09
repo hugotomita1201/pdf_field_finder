@@ -175,22 +175,38 @@ function displayResults(data) {
     let jsonData;
     if (data.enhancedFields && data.enhancedFields.length > 0) {
         // Create a clean JSON structure with labels
-        jsonData = data.enhancedFields.map(field => ({
-            type: field.type,
-            name: field.name,
-            label: field.label || 'Unknown',
-            labelConfidence: field.labelConfidence !== undefined ? 
-                Math.round(field.labelConfidence * 100) + '%' : 'N/A',
-            flags: field.flags || '1',
-            justification: field.justification || 'Left',
-            maxLength: field.maxLength || null,
-            value: field.value || '',
-            options: field.stateOptions || field.options || null,
-            checkboxValues: field.stateOptions ? {
-                toCheck: (field.stateOptions || []).filter(v => v !== 'Off'),
-                toUncheck: 'Off'
-            } : null
-        }));
+        jsonData = data.enhancedFields.map(field => {
+            const obj = {
+                type: field.type,
+                name: field.name,
+                flags: field.flags || '1',
+                justification: field.justification || 'Left',
+                maxLength: field.maxLength || null,
+                value: field.value || ''
+            };
+            
+            // Only add label if it exists and is meaningful
+            if (field.label && field.label !== field.name) {
+                obj.label = field.label;
+                obj.labelConfidence = field.labelConfidence !== undefined ? 
+                    Math.round(field.labelConfidence * 100) + '%' : 'N/A';
+            }
+            
+            // Add options if they exist
+            if (field.stateOptions || field.options) {
+                obj.options = field.stateOptions || field.options;
+            }
+            
+            // Add checkbox values if applicable
+            if (field.stateOptions) {
+                obj.checkboxValues = {
+                    toCheck: (field.stateOptions || []).filter(v => v !== 'Off'),
+                    toUncheck: 'Off'
+                };
+            }
+            
+            return obj;
+        });
     } else {
         // Fallback to original fields structure
         jsonData = data.fields;
@@ -296,22 +312,38 @@ function downloadJSON() {
     // Use enhanced fields if available, otherwise fall back to regular fields
     let jsonData;
     if (currentResults.enhancedFields && currentResults.enhancedFields.length > 0) {
-        jsonData = JSON.stringify(currentResults.enhancedFields.map(field => ({
-            type: field.type,
-            name: field.name,
-            label: field.label || 'Unknown',
-            labelConfidence: field.labelConfidence !== undefined ? 
-                Math.round(field.labelConfidence * 100) + '%' : 'N/A',
-            flags: field.flags || '1',
-            justification: field.justification || 'Left',
-            maxLength: field.maxLength || null,
-            value: field.value || '',
-            options: field.stateOptions || field.options || null,
-            checkboxValues: field.stateOptions ? {
-                toCheck: (field.stateOptions || []).filter(v => v !== 'Off'),
-                toUncheck: 'Off'
-            } : null
-        })), null, 2);
+        jsonData = JSON.stringify(currentResults.enhancedFields.map(field => {
+            const obj = {
+                type: field.type,
+                name: field.name,
+                flags: field.flags || '1',
+                justification: field.justification || 'Left',
+                maxLength: field.maxLength || null,
+                value: field.value || ''
+            };
+            
+            // Only add label if it exists and is meaningful
+            if (field.label && field.label !== field.name) {
+                obj.label = field.label;
+                obj.labelConfidence = field.labelConfidence !== undefined ? 
+                    Math.round(field.labelConfidence * 100) + '%' : 'N/A';
+            }
+            
+            // Add options if they exist
+            if (field.stateOptions || field.options) {
+                obj.options = field.stateOptions || field.options;
+            }
+            
+            // Add checkbox values if applicable
+            if (field.stateOptions) {
+                obj.checkboxValues = {
+                    toCheck: (field.stateOptions || []).filter(v => v !== 'Off'),
+                    toUncheck: 'Off'
+                };
+            }
+            
+            return obj;
+        }), null, 2);
     } else {
         jsonData = JSON.stringify(currentResults.fields, null, 2);
     }
